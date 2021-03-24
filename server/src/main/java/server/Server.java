@@ -25,7 +25,10 @@ public class Server {
 
     public Server() {
         clients = new CopyOnWriteArrayList<>();
-        authService = new SimpleAuthServise();
+        if (!DBHandler.connect()) {
+            throw new RuntimeException("База данных не подключена");
+        }
+        authService = new DBAuthService();
 
         try {
             server = new ServerSocket(PORT);
