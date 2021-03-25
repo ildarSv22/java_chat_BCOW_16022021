@@ -10,4 +10,9 @@ public class DBAuthService implements AuthService {
     public boolean registration(String login, String password, String nickname) {
         return DBHandler.registration(login,password,nickname);
     }
+
+    @Override
+    public boolean changeNick(String oldNickname, String newNickname) {
+        return DBHandler.changeNick(oldNickname, newNickname);
+    }
 }

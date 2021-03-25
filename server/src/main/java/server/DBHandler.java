@@ -7,6 +7,9 @@ public class DBHandler {
     private static PreparedStatement psGetNickname;
     private static PreparedStatement psRegistration;
 
+    private static PreparedStatement psChangeNick;
+    private static PreparedStatement psAddMessage;
+    private static PreparedStatement psGetMessageForNick;
 
     public static boolean connect() {
 
@@ -22,22 +25,41 @@ public class DBHandler {
     }
 
     private static  void prepareAllStatements () throws SQLException {
-        psGetNickname = connection.prepareStatement("SELECT nickname FROM users Where login = ? AND password = ?");
+        psGetNickname = connection.prepareStatement("SELECT nickname FROM users Where login = ? AND password = ?;");
         psRegistration = connection.prepareStatement("INSERT INTO users (login, password, nickname) VALUES (?, ?, ?);");
+
+        psChangeNick = connection.prepareStatement("UPDATE users SET nickname = ? WHERE nickname = ?;");
+        psAddMessage = connection.prepareStatement("INSERT INTO messages (sender, receiver, text, date) VALUES (\n" +
+                "(SELECT id FROM users WHERE nickname=?),\n" +
+                "(SELECT id FROM users WHERE nickname=?),\n" +
+                "?, ?)");
+
+        psGetMessageForNick = connection.prepareStatement("SELECT (SELECT nickname FROM users Where id = sender), \n" +
+                "       (SELECT nickname FROM users Where id = receiver),\n" +
+                "       text,\n" +
+                "       date \n" +
+                "FROM messages \n" +
+                "WHERE sender = (SELECT id FROM users WHERE nickname=?)\n" +
+                "OR receiver = (SELECT id FROM users WHERE nickname=?)\n" +
+                "OR receiver = (SELECT id FROM users WHERE nickname='null')");
+
     }
 
     public static String getNickNameByLoginAndPassword (String login, String password){
-        String nickname = null;
+        String nick = null;
         try {
             psGetNickname.setString(1,login);
             psGetNickname.setString(2, password);
             ResultSet result = psGetNickname.executeQuery();
-                while (result.next()){
-                     nickname = result.getString(1);
+               if (result.next()){
+                     nick = result.getString(1);
                 }
+
+                result.close();
+
         } catch (SQLException e) {
             e.printStackTrace();
-        } return nickname;
+        } return nick;
 
     }
 
@@ -55,10 +77,70 @@ public class DBHandler {
 
     }
 
+
+    public static boolean changeNick(String oldNickname, String newNickname) {
+        try {
+            psChangeNick.setString(1, newNickname);
+            psChangeNick.setString(2, oldNickname);
+            psChangeNick.executeUpdate();
+            return true;
+        } catch (SQLException e) {
+            return false;
+        }
+    }
+
+
+    public static boolean addMessage(String sender, String receiver, String text, String date) {
+        try {
+            psAddMessage.setString(1, sender);
+            psAddMessage.setString(2, receiver);
+            psAddMessage.setString(3, text);
+            psAddMessage.setString(4, date);
+            psAddMessage.executeUpdate();
+            return true;
+        } catch (SQLException e) {
+            return false;
+        }
+    }
+
+    public static String getMessageForNick(String nick) {
+        StringBuilder sb = new StringBuilder();
+
+        try {
+            psGetMessageForNick.setString(1, nick);
+            psGetMessageForNick.setString(2, nick);
+            ResultSet rs = psGetMessageForNick.executeQuery();
+
+            while (rs.next()) {
+                String sender = rs.getString(1);
+                String receiver = rs.getString(2);
+                String text = rs.getString(3);
+                String date = rs.getString(4);
+                //всем сообщение
+                if (receiver.equals("null")) {
+                    sb.append(String.format("[ %s ] : %s\n", sender, text));
+                } else {
+                    sb.append(String.format("[ %s ] to [ %s ]: %s\n", sender, receiver, text));
+                }
+            }
+            rs.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return sb.toString();
+    }
+
+
+
+
     public static void disconnect() {
         try {
             psRegistration.close();
             psGetNickname.close();
+            psChangeNick.close();
+            psAddMessage.close();
+            psGetMessageForNick.close();
 
         } catch (SQLException e) {
             e.printStackTrace();
